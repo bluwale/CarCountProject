@@ -100,7 +100,7 @@ def background_thread():
         results = counter(im0)
         
         # Extract the object (e.g., car) count from results.
-        # Adjust this extraction depending on how your solution returns the count.
+        # TODO: Adjust this extraction depending on how your solution returns the count.
         try:
             car_count = results.count
         except AttributeError:
@@ -160,3 +160,8 @@ def disconnect():
 # This runs the Flask app and WebSocket server to handle real-time communication.
 if __name__ == '__main__':
     socketio.run(app)
+
+#TODO: Add the necessary HTML and JavaScript code to create the real-time dashboard.
+# This will involve displaying the object count and current time in the dashboard.
+# You can use the provided "index.html" file as a starting point for the dashboard layout.
+#copilot really clutched up on summarizing TODOs great job!
