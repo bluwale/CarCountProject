@@ -106,6 +106,10 @@ def background_thread():
         except AttributeError:
             car_count = 0
 
+        #TODO: implement car count function to get total amount of cars counted in and out of the region
+        # display this count in the web dashboard 
+        #car_count = car_count(*car_count)
+
         # Emit the count and current time to the frontend
         socketio.emit('updateSensorData', {'count': car_count,
                                            "date": get_current_datetime()})
