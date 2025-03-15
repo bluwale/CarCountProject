@@ -5,9 +5,185 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
-    <title>ParkingLotCount</title>
+    <title>MNN Parking Lot Counter</title>
 </head>
 <body>
+    <header>
+        <div class="container">
+            <div class="logo">
+                <img src="{{ url_for('static', filename='images/mnn-logo.png') }}" alt="MNN Logo" onerror="this.src='/api/placeholder/60/60'; this.onerror=null;">
+                <div class="logo-text">MNN</div>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="#">Home</a></li>
+                    <li><a href="#">About</a></li>
+                    <li><a href="#">Services</a></li>
+                    <li><a href="#">Events</a></li>
+                    <li><a href="#">Contact</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
     
+    <div class="container">
+        <section class="counter-section">
+            <h2 class="counter-title">Parking Lot Live Car Counter</h2>
+            
+            <div class="counter-display">
+                <div class="count-label">Current Count</div>
+                <div class="count-value" id="carCount">{{ current_count|default(312) }}</div>
+                <div class="count-unit">Cars</div>
+            </div>
+            
+            <div class="timer-info">
+                <span id="status-indicator" class="status-indicator"></span>
+                <span id="status-text">Counter inactive</span> | Last updated: <span id="lastUpdated">{{ last_updated|default('N/A') }}</span>
+            </div>
+            
+            <div class="control-buttons">
+                <button id="startStopBtn" class="btn">Start/Stop</button>
+                <button id="refreshBtn" class="btn btn-secondary">Refresh Count</button>
+            </div>
+            
+            <div class="settings">
+                <h3 class="settings-title">Counter Settings</h3>
+                <div class="settings-group">
+                    <label class="settings-label" for="refreshInterval">Auto-refresh interval (seconds)</label>
+                    <input type="number" id="refreshInterval" class="settings-input" value="30" min="5" max="3600">
+                </div>
+            </div>
+        </section>
+    </div>
+    
+    <footer>
+        <div class="container">
+            <div class="footer-links">
+                <a href="#">Privacy Policy</a>
+                <a href="#">Terms of Service</a>
+                <a href="#">Contact Us</a>
+            </div>
+            <div class="footer-copyright">
+                &copy; 2025 Muslim Neighborhood Nexus (MNN). All rights reserved.
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // DOM Elements
+        const carCountElement = document.getElementById('carCount');
+        const startStopBtn = document.getElementById('startStopBtn');
+        const refreshBtn = document.getElementById('refreshBtn');
+        const refreshIntervalInput = document.getElementById('refreshInterval');
+        const statusIndicator = document.getElementById('status-indicator');
+        const statusText = document.getElementById('status-text');
+        const lastUpdatedElement = document.getElementById('lastUpdated');
+        
+        // State variables
+        let isCountingActive = false;
+        let countTimer = null;
+        let currentCount = parseInt(carCountElement.textContent) || 312;
+        
+        // Function to fetch count from server
+        async function fetchCount() {
+            try {
+                const response = await fetch('/api/car-count');
+                if (response.ok) {
+                    const data = await response.json();
+                    currentCount = data.count;
+                    updateCountDisplay();
+                    return true;
+                } else {
+                    console.error('Failed to fetch count');
+                    return false;
+                }
+            } catch (error) {
+                console.error('Error fetching count:', error);
+                // Fallback to simulated count for demo purposes
+                simulateCount();
+                return false;
+            }
+        }
+        
+        // Simulate a count for demo purposes
+        function simulateCount() {
+            // Random change between -5 and +5
+            const change = Math.floor(Math.random() * 11) - 5;
+            currentCount += change;
+            
+            // Ensure count doesn't go negative
+            if (currentCount < 0) currentCount = 0;
+            
+            updateCountDisplay();
+        }
+        
+        // Update the display with current count
+        function updateCountDisplay() {
+            carCountElement.textContent = currentCount;
+            lastUpdatedElement.textContent = new Date().toLocaleTimeString();
+        }
+        
+        // Refresh the count (either from API or simulation)
+        async function refreshCount() {
+            const success = await fetchCount();
+            if (!success) {
+                simulateCount();
+            }
+        }
+        
+        // Start/stop the counter
+        function toggleCounter() {
+            isCountingActive = !isCountingActive;
+            
+            if (isCountingActive) {
+                // Start counting
+                statusIndicator.classList.add('status-active');
+                statusText.textContent = 'Counter active';
+                startStopBtn.textContent = 'Stop';
+                
+                // Initial refresh
+                refreshCount();
+                
+                // Set up timer for auto-refresh
+                const interval = parseInt(refreshIntervalInput.value) * 1000;
+                countTimer = setInterval(refreshCount, interval);
+            } else {
+                // Stop counting
+                statusIndicator.classList.remove('status-active');
+                statusText.textContent = 'Counter inactive';
+                startStopBtn.textContent = 'Start';
+                
+                // Clear the timer
+                if (countTimer) {
+                    clearInterval(countTimer);
+                    countTimer = null;
+                }
+            }
+        }
+        
+        // Event listeners
+        startStopBtn.addEventListener('click', toggleCounter);
+        
+        refreshBtn.addEventListener('click', () => {
+            refreshCount();
+        });
+        
+        refreshIntervalInput.addEventListener('change', () => {
+            if (isCountingActive) {
+                // Restart timer with new interval
+                clearInterval(countTimer);
+                const interval = parseInt(refreshIntervalInput.value) * 1000;
+                countTimer = setInterval(refreshCount, interval);
+            }
+        });
+        
+        // Initialize with server data if available
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchCount().catch(() => {
+                // If fetch fails, just use the initial count
+                updateCountDisplay();
+            });
+        });
+    </script>
 </body>
 </html>
