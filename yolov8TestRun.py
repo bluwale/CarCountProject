@@ -88,37 +88,62 @@ def get_current_datetime():
     now = datetime.now()
     return now.strftime("%m/%d/%Y %H:%M:%S")
 
+#backend to make sure the object counting is not active when the user first loads the dashboard.
+counting_active = False
+
+
+# Background task for object counting
 def background_thread():
-    # Background task for object counting
+
+    global counting_active
     while cap.isOpened():
-        success, im0 = cap.read()
-        if not success:
-            print("Video frame is empty or processing is complete.")
-            break
+        if counting_active:
+            success, im0 = cap.read()
+            if not success:
+                print("Video frame is empty or processing is complete.")
+                break
 
-        # Process the frame using the object counter
-        results = counter(im0)
-        
-        # Extract the object (e.g., car) count from results.
-        # TODO: Adjust this extraction depending on how your solution returns the count.
-        try:
-            car_count = results.count
-        except AttributeError:
-            car_count = 0
+            # Process the frame using the object counter
+            results = counter(im0)
+            
+            # Extract the object (e.g., car) count from results.
+            try:
+                car_count = results.count
+            except AttributeError:
+                car_count = 0
 
-        #TODO: implement car count function to get total amount of cars counted in and out of the region
-        # display this count in the web dashboard 
-        #car_count = car_count(*car_count)
 
-        # Emit the count and current time to the frontend
-        socketio.emit('updateSensorData', {'count': car_count,
-                                           "date": get_current_datetime()})
-        
-        # Write the annotated frame to the output video file
-        video_writer.write(results.plot_im)
-        
-        # Sleep for a short time to simulate real-time processing based on FPS
-        socketio.sleep(1.0 / fps)
+            # Extract in and out counts properly
+            cars_in = getattr(results, "in_count", 0)  # Use .in_count attributeq
+            cars_out = getattr(results, "out_count", 0)  # Use .out_count attribute
+
+
+
+            print(f"Cars IN: {cars_in}, Cars OUT: {cars_out}")
+
+            totalCars = cars_in + (cars_out*-1)
+
+            print(f"Total Cars: {totalCars}")# Display the total count of cars in the region
+
+
+            video_writer.write(results.plot_im)  # write the processed frame.
+
+            # Break the loop if 'q' is pressed
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+
+
+            # Emit the count and current time to the frontend
+            socketio.emit('updateSensorData', {'count': totalCars,"date": get_current_datetime()})
+            
+            # Write the annotated frame to the output video file
+            video_writer.write(results.plot_im)
+            
+            # Sleep for a short time to simulate real-time processing based on FPS
+            socketio.sleep(1.0 / fps)
+        else:
+            # Sleep for a short time if counting is not active
+            socketio.sleep(1.0)
 
     # Clean up resources after processing is complete
     cap.release()
@@ -158,6 +183,27 @@ def connect():
 @socketio.on('disconnect')
 def disconnect():
     print('Client disconnected', request.sid)
+
+
+# WebSocket event: When the user toggles the counting status
+# This function toggles the counting_active variable to start or stop the object counting process. is connected to html start button
+@socketio.on('toggle_counting')
+def toggle_counting():
+    global counting_active
+    counting_active = not counting_active
+    print(f"Counting active: {counting_active}")
+    # Emit the current status back to the client
+    socketio.emit('counting_status', {'active': counting_active})
+
+
+
+#function will reset the count to 0 when the user clicks the "Reset Count" button in the dashboard.
+# This function emits the updated count to the frontend.
+@socketio.on('manualRefresh')
+def manual_refresh():
+    resetCount = 0
+    socketio.emit('updateSensorData', {'count': resetCount,
+                                           "date": get_current_datetime()})
 
 
 #Start the Flask-SocketIO server
