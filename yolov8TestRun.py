@@ -63,6 +63,7 @@ from ultralytics import solutions
 from threading import Lock
 from datetime import datetime
 
+
 # Set up video capture and properties
 cap = cv2.VideoCapture("Cars in Highway Traffic (FREE STOCK VIDEO).mp4")
 assert cap.isOpened(), "Error reading video file"
@@ -91,9 +92,14 @@ def get_current_datetime():
 #backend to make sure the object counting is not active when the user first loads the dashboard.
 counting_active = False
 
+#global vars to keep track of count offset with refresh button
+count_offset = 0
+last_totalCars = 0
+
 
 # Background task for object counting
 def background_thread():
+    global counting_active, count_offset, last_totalCars
 
     global counting_active
     while cap.isOpened():
@@ -121,9 +127,16 @@ def background_thread():
 
             print(f"Cars IN: {cars_in}, Cars OUT: {cars_out}")
 
-            totalCars = cars_in + (cars_out*-1)
+            rawTotalCars = cars_in + (cars_out*-1)
 
-            print(f"Total Cars: {totalCars}")# Display the total count of cars in the region
+            print(f"Total Cars: {rawTotalCars}")# Display the total count of cars in the region
+
+            
+            
+            last_totalCars = rawTotalCars 
+
+            display_count = rawTotalCars - count_offset
+            print(f"Display Count: {display_count}")
 
 
             video_writer.write(results.plot_im)  # write the processed frame.
@@ -134,7 +147,7 @@ def background_thread():
 
 
             # Emit the count and current time to the frontend
-            socketio.emit('updateSensorData', {'count': totalCars,"date": get_current_datetime()})
+            socketio.emit('updateSensorData', {'count': display_count,"date": get_current_datetime()})
             
             # Write the annotated frame to the output video file
             video_writer.write(results.plot_im)
@@ -201,10 +214,12 @@ def toggle_counting():
 # This function emits the updated count to the frontend.
 @socketio.on('manualRefresh')
 def manual_refresh():
-    resetCount = 0
-    socketio.emit('updateSensorData', {'count': resetCount,
-                                           "date": get_current_datetime()})
-
+    global count_offset, last_totalCars
+    # Set the current total as the new offset
+    count_offset = last_totalCars
+    print(f"Count reset! New offset: {count_offset}")
+    # Immediately send update to client to show zero
+    socketio.emit('updateSensorData', {'count': 0, "date": get_current_datetime()})
 
 #Start the Flask-SocketIO server
 # This runs the Flask app and WebSocket server to handle real-time communication.
