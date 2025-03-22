@@ -8,6 +8,37 @@
   <title>MNN Parking Lot Counter</title>
   <!-- Include Socket.IO client library -->
   <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+  <!-- Additional CSS for multi-camera layout -->
+  <style>
+    .counter-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+    
+    .counter-full {
+      grid-column: 1 / span 2;
+      border-top: 3px solid var(--primary-color);
+    }
+    
+    .camera-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--primary-color);
+      margin-bottom: 10px;
+    }
+    
+    @media (max-width: 768px) {
+      .counter-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .counter-full {
+        grid-column: 1;
+      }
+    }
+  </style>
 </head>
 <body>
   <header>
@@ -27,10 +58,30 @@
     <section class="counter-section">
       <h2 class="counter-title">Parking Lot Live Car Counter</h2>
       
-      <div class="counter-display">
-        <div class="count-label">Current Count</div>
-        <div class="count-value" id="totalCars">{{ current_count|default(312) }}</div>
-        <div class="count-unit">Cars</div>
+      <div class="counter-grid">
+        <!-- Camera 1 Counter -->
+        <div class="counter-display">
+          <div class="camera-title">Camera 1</div>
+          <div class="count-label">Count</div>
+          <div class="count-value" id="camera1Count">0</div>
+          <div class="count-unit">Cars</div>
+        </div>
+        
+        <!-- Camera 2 Counter -->
+        <div class="counter-display">
+          <div class="camera-title">Camera 2</div>
+          <div class="count-label">Count</div>
+          <div class="count-value" id="camera2Count">0</div>
+          <div class="count-unit">Cars</div>
+        </div>
+        
+        <!-- Combined Total Counter -->
+        <div class="counter-display counter-full">
+          <div class="camera-title">Total</div>
+          <div class="count-label">Combined Count</div>
+          <div class="count-value" id="totalCars">0</div>
+          <div class="count-unit">Cars</div>
+        </div>
       </div>
       
       <div class="timer-info">
@@ -42,11 +93,8 @@
         <button id="startStopBtn" class="btn">Start</button>
         <button id="refreshBtn" class="btn btn-secondary">Refresh Count</button>
       </div>
-      
-
     </section>
   </div>
-  
   
   <footer>
     <div class="container">
@@ -62,8 +110,10 @@
     // Establish SocketIO connection
     const socket = io();
 
-    // DOM Elements (note we now correctly use the 'totalCars' ID)
-    const carCountElement = document.getElementById('totalCars');
+    // DOM Elements
+    const camera1CountElement = document.getElementById('camera1Count');
+    const camera2CountElement = document.getElementById('camera2Count');
+    const totalCarsElement = document.getElementById('totalCars');
     const startStopBtn = document.getElementById('startStopBtn');
     const refreshBtn = document.getElementById('refreshBtn');
     const statusIndicator = document.getElementById('status-indicator');
@@ -72,14 +122,20 @@
 
     // Listen for live car count updates from the server
     socket.on('updateSensorData', function(data) {
-      carCountElement.textContent = data.count;
+      // Update individual camera counts
+      camera1CountElement.textContent = data.count1;
+      camera2CountElement.textContent = data.count2;
+      
+      // Update total count
+      totalCarsElement.textContent = data.combined_count;
+      
+      // Update timestamp
       lastUpdatedElement.textContent = data.date;
     });
 
-    // Optional: Handle Start/Stop button functionality.
-    startStopBtn.addEventListener('click', function() {
-      socket.emit("toggle_counting");
-      if (startStopBtn.textContent === "Start") {
+    // Handle counting status updates
+    socket.on('counting_status', function(data) {
+      if (data.active) {
         startStopBtn.textContent = "Stop";
         statusIndicator.classList.add('status-active');
         statusText.textContent = 'Counter active';
@@ -87,12 +143,17 @@
         startStopBtn.textContent = "Start";
         statusIndicator.classList.remove('status-active');
         statusText.textContent = 'Counter inactive';
-        // TODO: emit an event to resume the counter on the server.
       }
     });
 
+    // Start/Stop button click handler
+    startStopBtn.addEventListener('click', function() {
+      socket.emit("toggle_counting");
+    });
+
+    // Refresh button click handler
     refreshBtn.addEventListener('click', function() {
-        socket.emit("manualRefresh");
+      socket.emit("manualRefresh");
     });
   </script>
 </body>
